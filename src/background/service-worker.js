@@ -1,0 +1,1 @@
+console.log("DivBurglar Service Worker reporting for duty.");

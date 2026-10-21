@@ -1,0 +1,1 @@
+console.log("DivBurglar Content Script injected into:", window.location.hostname, "\n Prepped for heist.");

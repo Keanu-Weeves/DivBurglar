@@ -1,9 +1,25 @@
 {
     "manifest_version": 3,
-    "name": "Tracekit",
+    "name": "DivBurglar",
     "version": "1.0.0",
-    "description": "The Ultimate UI Heist",
+    "description": "The Ultimate UI Heist: Reverse-engineer live DOM components into Tailwind CSS, React JSX, and Framer Motion.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage",
+        "downloads"
+    ],
     "action": {
         "default_popup": "index.html"
-    }
+    },
+    "background": {
+        "service-worker": "src/background/service-worker.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["src/content/content.js"]
+        }
+    ]
 }
