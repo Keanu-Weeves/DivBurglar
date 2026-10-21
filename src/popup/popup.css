@@ -1,0 +1,46 @@
+.popup-container {
+    padding: 16;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.popup-header h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.badge {
+    background: #1e293b;
+    color: #38bdf8;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid #334155;
+}
+
+.subtitle {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.primary-btn {
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.primary-btn:hover {
+    background-color: #1d4ed8;
+}
