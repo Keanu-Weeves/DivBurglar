@@ -1,9 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './popup.css';
 
 export default function Popup() {
     const [isArmed, setIsArmed] = useState(false);
     const [format, setFormat] = useState('TAILWIND');
+    const [statusMsg, setStatusMsg] = useState('Dom Extraction Telemetry');
+
+    useEffect(() => {
+        if (!window.chrome?.tabs) return;
+        window.chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            if (!tab?.id) return;
+            window.chrome.tabs.sendMessage(tab.id, { type: 'GET_STATUS' }, (response) => {
+                if (window.chrome.runtime.lastError) return;
+                if (response) {
+                    setIsArmed(response.isArmed);
+                    setFormat(response.format);
+                }
+            });
+        });
+    }, []);
+
+    const toggleScanner = () => {
+        const nextState = !isArmed;
+        if (!window.chrome?.tabs) {
+            setIsArmed(nextState);
+            return;
+        }
+
+        window.chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            if (!tab?.id) return;
+            window.chrome.tabs.sendMessage(
+                tab.id,
+                { type: 'TOGGLE_SCANNER', isArmed: nextState, format },
+                (response) => {
+                    if (window.chrome.runtime.lastError) {
+                        setStatusMsg('ERR // REFRESH TARGET TAB');
+                        return;
+                    }
+                    if (response?.ok) {
+                        setIsArmed(nextState);
+                        setStatusMsg(nextState ? 'SCANNER ACTIVE // ESC TO ABORT' : 'DOM EXTRACTION TELEMETRY');
+                    }
+                }
+            );
+        });
+    };
+
+    const handleFormatChange = (newFormat) => {
+        setFormat(newFormat);
+        if (!window.chrome?.tabs) return;
+        window.chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            if (!tab?.id) return;
+            window.chrome.tabs.sendMessage(tab.id, { type: 'SET_FORMAT', format: newFormat }, () => {
+                void window.chrome.runtime.lastError;
+            });
+        });
+    };
 
     return (
         <div className="hud-container">
@@ -11,7 +63,7 @@ export default function Popup() {
             <header className="hud-header">
                 <div>
                     <h1 className="brand-title">DivBurglar</h1>
-                    <p className="brand-subtitle">DOM Extraction Telemetry</p>
+                    <p className="brand-subtitle">{statusMsg}</p>
                 </div>
                 <div className="status-readout">
                     <div className={`status-indicator ${isArmed ? 'armed' : ''}`}>
@@ -29,7 +81,7 @@ export default function Popup() {
                 </div>
                 <button
                     className={`snatcher-btn ${isArmed ? 'armed' : ''}`}
-                    onClick={() => setIsArmed(!isArmed)}
+                    onClick={toggleScanner}
                 >
                     {isArmed ? 'Disarm Scanner' : 'Engage DOM Scanner'}
                 </button>
@@ -46,7 +98,7 @@ export default function Popup() {
                     <button
                         key={item}
                         className={`format-btn ${format === item ? 'active' : ''}`}
-                        onClick={() => setFormat(item)}
+                        onClick={() => handleFormatChange(item)}
                     >
                     {item}
                     </button>
