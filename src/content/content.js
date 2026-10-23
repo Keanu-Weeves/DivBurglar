@@ -1,3 +1,5 @@
+import { extractElementStyles } from "./extractor.js";
+
 let isArmed = false;
 let currentFormat = 'TAILWIND';
 let hoveredElement = null;
@@ -120,11 +122,13 @@ function handleClick(event) {
 
     const target = event.target;
 
+    const rawStyles = extractElementStyles(target);
+
     reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.22)';
     reticle.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
     modeReadout.textContent = 'CAPTURED // LOGGED';
 
-    console.log(`[DivBurglar] Snatched <${target.tagName.toLowerCase()}> in ${currentFormat} mode:`, target);
+    console.log(`[DivBurglar] Extracted Raw Telemetry Payload:`, rawStyles);
 
     setTimeout(() => {
         reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
