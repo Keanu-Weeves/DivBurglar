@@ -52,13 +52,66 @@ hudCard.innerHTML = `
     </div>
 `;
 
+//post capture modal
+const modalOverlay = document.createElement('div');
+modalOverlay.style.cssText = `
+position: fixed; top: 0; width: 100vw; height: 100vh;
+background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(3px);
+display: none; justify-content: center; align-items: center; z-index: 2147483647; pointer-events: auto;
+`;
+
+modalOverlay.innerHTML = `
+    <div style="background: #000000; border: 1px solid #2a2a2a; width: 600px; max-width: 90vw; padding: 24px; box-shadow: 0 24px 48px rgba(0,0,0,0.9); display: flex; flex-direction: column; gap: 16px; font-family: 'Roboto', sans-serif;">
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2a2a; padding-bottom: 10px;>
+            <span style="color: #ffffff; font-size: 14px; letter-spacing: 3px; font-weight: 300;">SUCCESSFUL HEIST</span>
+            <span id="db-modal-close" style="color: #666666; font-size: 11px; cursor: pointer; letter-spacing: 2px; transition: color 0.2s;">[ ESC TO CLOSE ]</span>
+        </div>
+    
+        <div style="display: flex; gap: 8px;" id="db-modal-tabs">
+        <span style="color: #ffffff; border: 1px solid #ffffff; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">TAILWIND</span>
+        <span style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">REACT JSX</span>
+        <span style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">RAW CSS</span>
+        </div>
+
+        <textarea id="db-modal-code" readonly style="width: 100%; height: 280px; background: #050505; border: 1px solid #1a1a1a; color: #999999; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; padding: 16px; resize: none; outline: none;"></textarea>
+
+        <button id="db-modal-copy" style="background: transparent; border: 1px solid #ffffff; color: #ffffff; padding: 14px; font-size: 12px; letter-spacing: 4px; cursor: pointer; transition: all 0.2s ease;">
+        [ COPY TO CLIPBOARD ]
+        </button>
+    </div>
+`
+
 shadow.appendChild(reticle);
 shadow.appendChild(hudCard);
+shadow.appendChild(modalOverlay);
 
 const tagReadout = shadow.getElementById('db-tag-readout');
 const dimsReadout = shadow.getElementById('db-dims-readout');
 const layoutReadout = shadow.getElementById('db-layout-readout');
 const modeReadout = shadow.getElementById('db-mode-readout');
+
+const modalClose = shadow.getElementById('db-modal-close');
+const modalCode = shadow.getElementById('db-modal-code');
+const modalCopy = shadow.getElementById('db-modal-copy');
+
+//modal logic
+modalClose.addEventListener('click', () => { modalOverlay.style.display = 'none'; });
+modalClose.addEventListener('mouseenter', () => { modalClose.style.color = '#ffffff'; });
+modalClose.addEventListener('mouseleave', () => { modalClose.style.color = '#666666'; });
+
+modalCopy.addEventListener('click', () => {
+    navigator.clipboard.writeText(modalCode.value);
+    modalCopy.textContent = '[ COPIED TO CLIPBOARD! ]';
+    modalCopy.style.backgroundColor = '#ffffff';
+    modalCopy.style.color = '#000000';
+
+    setTimeout(() => {
+        modalCopy.textContent = '[ COPY TO CLIPBOARD ]';
+        modalCopy.style.backgroundColor = 'transparent';
+        modalCopy.style.color = '#ffffff';
+    }, 1500);
+});
 
 //helper to format element tag + primary class for the hud header
 function formatElementLabel(el) {
@@ -126,13 +179,14 @@ function handleClick(event) {
 
     reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.22)';
     reticle.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
-    modeReadout.textContent = 'CAPTURED // LOGGED';
-
-    console.log(`[DivBurglar] Extracted Raw Telemetry Payload:`, rawStyles);
+    modeReadout.textContent = 'EXTRACTED // PARSING';
+    //temporary until tailwind mapper is built
+    modalCode.value = JSON.stringify(rawStyles, null, 2);
 
     setTimeout(() => {
         reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
         reticle.style.boxShadow = '0 0 12px rgba(255, 255, 255, 0.12), inset 0 0 8px rgba(255, 255, 255, 0.05)';
+        modalOverlay.style.display = 'flex';
         setScannerState(false);
     }, 350);
 }
@@ -162,6 +216,9 @@ function setScannerState(armed) {
         hoveredElement = null;
     }
 }
+
+//global escape listener to close modal even when disarmed
+document.addEventListener('keydown', handleKeyDown);
 
 //listen for popup.jsx
 window.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

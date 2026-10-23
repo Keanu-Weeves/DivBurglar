@@ -35,11 +35,17 @@ export default function Popup() {
                 (response) => {
                     if (window.chrome.runtime.lastError) {
                         setStatusMsg('ERR // REFRESH TARGET TAB');
+                        setStatusMsg(nextState ? 'SCANNER ACTIVE // ESC TO ABORT' : 'DOM EXTRACTION TELEMETRY');
+
                         return;
                     }
                     if (response?.ok) {
                         setIsArmed(nextState);
-                        setStatusMsg(nextState ? 'SCANNER ACTIVE // ESC TO ABORT' : 'DOM EXTRACTION TELEMETRY');
+                        if (nextState) {
+                            window.close();
+                        } else {
+                            setStatusMsg('DOM Extraction Telemetry');
+                        }
                     }
                 }
             );
