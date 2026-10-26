@@ -5,6 +5,10 @@ let isArmed = false;
 let currentFormat = 'TAILWIND';
 let hoveredElement = null;
 
+//modal state mgmnt
+let currentModalFormat = 'TAILWIND';
+let capturedPayload = null;
+
 // mount an isolated shadow DOM host so page CSS never affects the HUD.
 const host = document.createElement('div');
 host.id = 'divburglar-hud-host';
@@ -56,23 +60,24 @@ hudCard.innerHTML = `
 //post capture modal
 const modalOverlay = document.createElement('div');
 modalOverlay.style.cssText = `
-position: fixed; top: 0; width: 100vw; height: 100vh;
-background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(3px);
-display: none; justify-content: center; align-items: center; z-index: 2147483647; pointer-events: auto;
+    position: fixed; top: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(3px);
+    display: none; justify-content: center; align-items: center; z-index: 2147483647; pointer-events: auto;
 `;
 
 modalOverlay.innerHTML = `
     <div style="background: #000000; border: 1px solid #2a2a2a; width: 600px; max-width: 90vw; padding: 24px; box-shadow: 0 24px 48px rgba(0,0,0,0.9); display: flex; flex-direction: column; gap: 16px; font-family: 'Roboto', sans-serif;">
 
-        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2a2a; padding-bottom: 10px;>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2a2a; padding-bottom: 10px;">
             <span style="color: #ffffff; font-size: 14px; letter-spacing: 3px; font-weight: 300;">SUCCESSFUL HEIST</span>
             <span id="db-modal-close" style="color: #666666; font-size: 11px; cursor: pointer; letter-spacing: 2px; transition: color 0.2s;">[ ESC TO CLOSE ]</span>
         </div>
     
         <div style="display: flex; gap: 8px;" id="db-modal-tabs">
-        <span style="color: #ffffff; border: 1px solid #ffffff; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">TAILWIND</span>
-        <span style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">REACT JSX</span>
-        <span style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">RAW CSS</span>
+            <span id="db-tab-tailwind" style="color: #ffffff; border: 1px solid #ffffff; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">TAILWIND</span>
+            <span id="db-tab-react" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">REACT JSX</span>
+            <span id="db-tab-react-inline" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">REACT INLINE</span>
+            <span id="db-tab-css" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">RAW CSS</span>
         </div>
 
         <textarea id="db-modal-code" readonly style="width: 100%; height: 280px; background: #050505; border: 1px solid #1a1a1a; color: #999999; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; padding: 16px; resize: none; outline: none;"></textarea>
@@ -95,6 +100,115 @@ const modeReadout = shadow.getElementById('db-mode-readout');
 const modalClose = shadow.getElementById('db-modal-close');
 const modalCode = shadow.getElementById('db-modal-code');
 const modalCopy = shadow.getElementById('db-modal-copy');
+
+//tabs
+const tabs = {
+    'TAILWIND': shadow.getElementById('db-tab-tailwind'),
+    'REACT JSX': shadow.getElementById('db-tab-react'),
+    'REACT INLINE': shadow.getElementById('db-tab-react-inline'),
+    'RAW CSS': shadow.getElementById('db-tab-css')
+};
+
+function updateModalTabs() {
+    for (const [key, el] of Object.entries(tabs)) {
+        if (!el) continue;
+        if (key === currentModalFormat) {
+            el.style.color = '#ffffff';
+            el.style.border = '1px solid #ffffff';
+        } else {
+            el.style.color = '#666666';
+            el.style.border = '1px solid #2a2a2a';
+        }
+    }
+}
+
+function renderModalCode() {
+    if (!capturedPayload) return;
+    const tailwindClasses = compileToTailwind(capturedPayload);
+    const { tag, text, css } = capturedPayload;
+
+    if (currentModalFormat === 'TAILWIND') {
+        modalCode.value = `<${tag} class="${tailwindClasses}">\n  ${text}\n</${tag}>`;
+    } else if (currentModalFormat === 'REACT JSX') {
+        const voidElements = ['img', 'input', 'br', 'hr', 'path', 'svg'];
+        const isVoid = voidElements.includes(tag);
+
+        //capitalize tag name for component
+        const componentName = `Burgled${tag.charAt(0).toUpperCase() + tag.slice(1)}`;
+
+        let jsxString = `export default function ${componentName}() {\n`;
+        jsxString += ` return (\n`;
+
+        if (isVoid) {
+            jsxString += `  <${tag} className="${tailwindClasses}" />\n`;
+        } else {
+            jsxString += `  <${tag} className="${tailwindClasses}">\n`;
+            if (text) {
+                jsxString += `      ${text}\n`;
+            } else if (capturedPayload.hasChildren) {
+                jsxString += `      {/* Extracted children go here */}\n`;
+            }
+            jsxString += `   </${tag}>\n`;
+        }
+
+        jsxString += `  );\n`;
+        jsxString += `}`;
+
+        modalCode.value = jsxString;
+    }
+    else if (currentModalFormat === 'REACT INLINE') {
+        const voidElements = ['img', 'input', 'br', 'hr', 'path', 'svg'];
+        const isVoid = voidElements.includes(tag);
+        const componentName = `Burgled${tag.charAt(0).toUpperCase() + tag.slice(1)}`;
+        //convertkebab-case CSS to camelCse React style obj
+        let styleObjectString = '{\n';
+        for (const [prop, value] of Object.entries(css)) {
+            const camelProp = prop.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+            const safeValue = value.replace(/g'/g, "\\'"); //escape single quotes
+            styleObjectString += `        ${camelProp}: '${safeValue}',\n`;
+        }
+        styleObjectString += '      }';
+
+        let jsxString = `export default function ${componentName}() {\n`;
+        jsxString += `  return (\n`;
+
+        if (isVoid) {
+            jsxString += `    <${tag} style={${styleObjectString}} />\n`;
+        } else {
+            jsxString += `    <${tag} style={${styleObjectString}}>\n`;
+            if (text) {
+                jsxString += `      ${text}\n`;
+            } else if (capturedPayload.hasChildren) {
+                jsxString += `      {/* Extracted children go here */}\n`;
+            }
+            jsxString += `    </${tag}>\n`;
+        }
+
+        jsxString += `  );\n`;
+        jsxString += `}`;
+
+        modalCode.value = jsxString;
+    }
+    else if (currentModalFormat === 'RAW CSS') {
+        let cssString = `.divburglar-element {\n`;
+        for (const [prop, value] of Object.entries(css)) {
+            cssString += ` ${prop}: ${value};\n`;
+        }
+        cssString += `}`;
+        modalCode.value = cssString;
+    }
+}
+
+//attach the tab listeners
+for (const [key, el] of Object.entries(tabs)) {
+    if (el) {
+        el.addEventListener('click', () => {
+            currentModalFormat = key;
+            updateModalTabs();
+            renderModalCode();
+        });
+    }
+}
 
 //modal logic
 modalClose.addEventListener('click', () => { modalOverlay.style.display = 'none'; });
@@ -174,33 +288,24 @@ function handleClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    const target = event.target;
-    const rawStyles = extractElementStyles(target);
-
-    //run through the tailwind mapper
-    const tailwindClasses = compileToTailwind(rawStyles);
-
-    //generate a html snippet
-    const htmlSnippet = `<${rawStyles.tag} class="${tailwindClasses}">\n  ${rawStyles.text}\n</${rawStyles.tag}>`;
+    //save payload globally so tabs can recalculate
+    capturedPayload = extractElementStyles(event.target);
 
     reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.22)';
     reticle.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
-    modeReadout.textContent = 'EXTRACTED // PARSING';
-    //inject translated HTML/Tailwind snippet into modal
-    modalCode.value = htmlSnippet;
+    if (modeReadout) modeReadout.textContent = 'EXTRACTED // PARSING';
+
+    //initialize modal view
+    updateModalTabs();
+    renderModalCode();
 
     setTimeout(() => {
         reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
         reticle.style.boxShadow = '0 0 12px rgba(255, 255, 255, 0.12), inset 0 0 8px rgba(255, 255, 255, 0.05)';
         modalOverlay.style.display = 'flex';
+        modalCode.focus();
         setScannerState(false);
     }, 350);
-}
-
-function handleKeyDown(event) {
-    if (isArmed && event.key === 'Escape') {
-        setScannerState(false);
-    }
 }
 
 function setScannerState(armed) {
@@ -209,13 +314,11 @@ function setScannerState(armed) {
         document.addEventListener('mousemove', handleMouseMove, true);
         window.addEventListener('scroll', handleScroll, true);
         document.addEventListener('click', handleClick, true);
-        document.addEventListener('keydown', handleKeyDown, true);
         document.body.style.cursor = 'crosshair';
     } else {
         document.removeEventListener('mousemove', handleMouseMove, true);
         window.removeEventListener('scroll', handleScroll, true);
         document.removeEventListener('click', handleClick, true);
-        document.removeEventListener('keydown', handleKeyDown, true);
         document.body.style.cursor = '';
         reticle.style.display = 'none';
         hudCard.style.display = 'none';
@@ -224,7 +327,15 @@ function setScannerState(armed) {
 }
 
 //global escape listener to close modal even when disarmed
-document.addEventListener('keydown', handleKeyDown);
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        if (modalOverlay.style.display === 'flex') {
+            modalOverlay.style.display = 'none';
+        } else if (isArmed) {
+            setScannerState(false);
+        }
+    }
+}, true);
 
 //listen for popup.jsx
 window.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -236,7 +347,7 @@ window.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => 
         sendResponse({ ok: true, isArmed });
     } else if (message.type === 'SET_FORMAT') {
         currentFormat = message.format;
-        modeReadout.textContent = currentFormat;
+        if (isArmed && modeReadout) modeReadout.textContent = currentFormat;
         sendResponse({ ok: true });
     }
     return true;
