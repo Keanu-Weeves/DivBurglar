@@ -52,7 +52,8 @@ export function extractElementStyles(el) {
     };
 
     const uselessColors = [
-        'caret-color', 'column-rule-color', 'text-decoration-color', 'text-emphasis-color', 'outline-color'
+        'caret-color', 'column-rule-color', 'text-decoration-color', 'text-emphasis-color', 'outline-color',
+        'color-scheme', 'text-size-adjust'
     ];
 
     //loop through all properties and keep only what has been changed

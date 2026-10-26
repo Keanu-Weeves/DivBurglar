@@ -1,4 +1,5 @@
 import { extractElementStyles } from "./extractor.js";
+import { compileToTailwind } from "../engine/tailwind-mapper.js";
 
 let isArmed = false;
 let currentFormat = 'TAILWIND';
@@ -174,14 +175,19 @@ function handleClick(event) {
     event.stopPropagation();
 
     const target = event.target;
-
     const rawStyles = extractElementStyles(target);
+
+    //run through the tailwind mapper
+    const tailwindClasses = compileToTailwind(rawStyles);
+
+    //generate a html snippet
+    const htmlSnippet = `<${rawStyles.tag} class="${tailwindClasses}">\n  ${rawStyles.text}\n</${rawStyles.tag}>`;
 
     reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.22)';
     reticle.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
     modeReadout.textContent = 'EXTRACTED // PARSING';
-    //temporary until tailwind mapper is built
-    modalCode.value = JSON.stringify(rawStyles, null, 2);
+    //inject translated HTML/Tailwind snippet into modal
+    modalCode.value = htmlSnippet;
 
     setTimeout(() => {
         reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
