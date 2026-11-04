@@ -81,10 +81,15 @@ modalOverlay.innerHTML = `
         </div>
 
         <textarea id="db-modal-code" readonly style="width: 100%; height: 280px; background: #050505; border: 1px solid #1a1a1a; color: #999999; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; padding: 16px; resize: none; outline: none;"></textarea>
-
-        <button id="db-modal-copy" style="background: transparent; border: 1px solid #ffffff; color: #ffffff; padding: 14px; font-size: 12px; letter-spacing: 4px; cursor: pointer; transition: all 0.2s ease;">
-        [ COPY TO CLIPBOARD ]
-        </button>
+        
+        <div style="display: flex; gap: 8px;">
+            <button id="db-modal-copy" style="flex: 1; background: transparent; border: 1px solid #ffffff; color: #ffffff; padding: 14px; font-size: 12px; letter-spacing: 4px; cursor: pointer; transition: all 0.2s ease;">
+                [ COPY CODE ]
+            </button>
+            <button id="db-modal-download" style="flex: 1; background: #ffffff; border: 1px solid #ffffff; color: #000000; padding: 14px; font-size: 12px; letter-spacing: 4px; cursor: pointer; transition: all 0.2s ease;">
+                [ DOWNLOAD FILE ]
+            </button>
+        </div>
     </div>
 `
 
@@ -100,6 +105,7 @@ const modeReadout = shadow.getElementById('db-mode-readout');
 const modalClose = shadow.getElementById('db-modal-close');
 const modalCode = shadow.getElementById('db-modal-code');
 const modalCopy = shadow.getElementById('db-modal-copy');
+const modalDownload = shadow.getElementById('db-modal-download');
 
 //tabs
 const tabs = {
@@ -124,78 +130,104 @@ function updateModalTabs() {
 
 function renderModalCode() {
     if (!capturedPayload) return;
-    const tailwindClasses = compileToTailwind(capturedPayload);
-    const { tag, text, css } = capturedPayload;
+
+    const voidElements = ['img', 'input', 'br', 'hr', 'path', 'svg', 'circle', 'line', 'polygon', 'rect'];
+
+    //recursive html builder
+    function buildHTML(node, indent = '') {
+        if (node.type === 'text') return `${indent}$node.content}\n`;
+
+        const tw = compileToTailwind({ css: node.css });
+        const classAttr = tw ? ` class="${tw}"` : '';
+        if (voidElements.includes(node.tag)) return `${indent}<${node.tag}${classAttr} />\n`;
+
+        let html = `${indent}<${node.tag}${classAttr}\n`;
+        for (const child of node.children) html += buildHTML(child, indent + ' ');
+        html += `${indent}</${node.tag}>\n`;
+        return html;
+    }
+
+    //recursive react jsx builder
+    function buildJSX(node, indent = '') {
+        if (node.type === 'text') return `${indent}${node.content}\n`;
+
+        const tw = compileToTailwind({ css: node.css });
+        const classAttr = tw ? ` className="${tw}"` : '';
+        if (voidElements.includes(node.tag)) return `${indent}<${node.tag}${classAttr} />\n`;
+
+        let html = `${indent}<${node.tag}${classAttr}>\n`;
+        for (const child of node.children) html += buildJSX(child, indent + '  ');
+        html += `${indent}</${node.tag}>\n`;
+        return html;
+    }
+
+    //recursive react inline builder
+    function buildInlineJSX(node, indent = '') {
+        if (node.type === 'text') return `${indent}${node.content}\n`;
+
+        let styleObj = '';
+        const cssKeys = Object.keys(node.css);
+        if (cssKeys.length > 0) {
+            styleObj = ' style={{ ';
+            for (const prop of cssKeys) {
+                const camelProp = prop.replace(/-([a-z]) /g, g => g[1].toUpperCase());
+                const safeVal = node.css[prop].replace(/'/g, "\\'");
+                styleObj += `${camelProp}: '${safeVal}', `;
+            }
+            styleObj += '}}';
+        }
+
+        if (voidElements.includes(node.tag)) return `${indent}<${node.tag}${styleObj} />\n`;
+
+        let html = `${indent}<${node.tag}${styleObj}>\n`;
+        for (const child of node.children) html += buildInlineJSX(child, indent + '  ');
+        html += `${indent}</${node.tag}>\n`;
+        return html;
+    }
+
+    //recursive raw css builder -- generates auto classes and stylesheet
+    let cssRules = '';
+    let classCounter = 0;
+    function buildRawCSS(node, indent = '') {
+        if (node.type === 'text') return `${indent}${node.content}\n`;
+
+        classCounter++;
+        const className = `db-el-${classCounter}`;
+
+        if (Object.keys(node.css).length > 0) {
+            cssRules += `.${className} {\n`;
+            for (const [prop, value] of Object.entries(node.css)) {
+                cssRules += `  ${prop}: ${value};\n`;
+            }
+            cssRules += `}\n\n`;
+        }
+
+        if (voidElements.includes(node.tag)) return `${indent}<${node.tag} class="${className}" />\n`;
+
+        let html = `${indent}<${node.tag} class="${className}">\n`;
+        for (const child of node.children) html += buildRawCSS(child, indent + '  ');
+        html += `${indent}</${node.tag}>\n`;
+        return html;
+    }
+
+    //output
+    const rootTag = capturedPayload.tag;
+    const componentName = `Burgled${rootTag.charAt(0).toUpperCase() + rootTag.slice(1)}`;
 
     if (currentModalFormat === 'TAILWIND') {
-        modalCode.value = `<${tag} class="${tailwindClasses}">\n  ${text}\n</${tag}>`;
-    } else if (currentModalFormat === 'REACT JSX') {
-        const voidElements = ['img', 'input', 'br', 'hr', 'path', 'svg'];
-        const isVoid = voidElements.includes(tag);
-
-        //capitalize tag name for component
-        const componentName = `Burgled${tag.charAt(0).toUpperCase() + tag.slice(1)}`;
-
-        let jsxString = `export default function ${componentName}() {\n`;
-        jsxString += ` return (\n`;
-
-        if (isVoid) {
-            jsxString += `  <${tag} className="${tailwindClasses}" />\n`;
-        } else {
-            jsxString += `  <${tag} className="${tailwindClasses}">\n`;
-            if (text) {
-                jsxString += `      ${text}\n`;
-            } else if (capturedPayload.hasChildren) {
-                jsxString += `      {/* Extracted children go here */}\n`;
-            }
-            jsxString += `   </${tag}>\n`;
-        }
-
-        jsxString += `  );\n`;
-        jsxString += `}`;
-
-        modalCode.value = jsxString;
+        modalCode.value = buildHTML(capturedPayload);
+    }
+    else if (currentModalFormat === 'REACT JSX') {
+        modalCode.value = `export default function ${componentName}() {\n  return (\n${buildJSX(capturedPayload, '    ')}  );\n}`;
     }
     else if (currentModalFormat === 'REACT INLINE') {
-        const voidElements = ['img', 'input', 'br', 'hr', 'path', 'svg'];
-        const isVoid = voidElements.includes(tag);
-        const componentName = `Burgled${tag.charAt(0).toUpperCase() + tag.slice(1)}`;
-        //convertkebab-case CSS to camelCse React style obj
-        let styleObjectString = '{\n';
-        for (const [prop, value] of Object.entries(css)) {
-            const camelProp = prop.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-            const safeValue = value.replace(/g'/g, "\\'"); //escape single quotes
-            styleObjectString += `        ${camelProp}: '${safeValue}',\n`;
-        }
-        styleObjectString += '      }';
-
-        let jsxString = `export default function ${componentName}() {\n`;
-        jsxString += `  return (\n`;
-
-        if (isVoid) {
-            jsxString += `    <${tag} style={${styleObjectString}} />\n`;
-        } else {
-            jsxString += `    <${tag} style={${styleObjectString}}>\n`;
-            if (text) {
-                jsxString += `      ${text}\n`;
-            } else if (capturedPayload.hasChildren) {
-                jsxString += `      {/* Extracted children go here */}\n`;
-            }
-            jsxString += `    </${tag}>\n`;
-        }
-
-        jsxString += `  );\n`;
-        jsxString += `}`;
-
-        modalCode.value = jsxString;
+        modalCode.value = `export default function ${componentName}() {\n  return (\n${buildInlineJSX(capturedPayload, '    ')}  );\n}`;
     }
     else if (currentModalFormat === 'RAW CSS') {
-        let cssString = `.divburglar-element {\n`;
-        for (const [prop, value] of Object.entries(css)) {
-            cssString += ` ${prop}: ${value};\n`;
-        }
-        cssString += `}`;
-        modalCode.value = cssString;
+        cssRules = '';
+        classCounter = 0;
+        const rawHTML = buildRawCSS(capturedPayload);
+        modalCode.value = `/* --- CSS STYLESHEET --- */\n${cssRules}\n<!-- --- HTML MARKUP --- -->\n${rawHTML}`;
     }
 }
 
@@ -225,6 +257,31 @@ modalCopy.addEventListener('click', () => {
         modalCopy.textContent = '[ COPY TO CLIPBOARD ]';
         modalCopy.style.backgroundColor = 'transparent';
         modalCopy.style.color = '#ffffff';
+    }, 1500);
+});
+
+modalDownload.addEventListener('click', () => {
+    // determine fle extension based on active tab
+    let ext = 'html';
+    if (currentModalFormat.includes('REACT')) ext = 'tsx';
+    if (currentModalFormat === 'RAW CSS') ext = 'css';
+
+    //create physical file in browser memory
+    const blob = new Blob([modalCode.value], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    //trigger ghost click download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `DivBurglar_Component.${ext}`;
+    a.click();
+
+    //cleanup memory
+    URL.revokeObjectURL(url);
+
+    modalDownload.textContent = '[ DOWNLOADING... ]';
+    setTimeout(() => {
+        modalDownload.textContent = '[ DOWNLOAD FILE ]';
     }, 1500);
 });
 
@@ -289,7 +346,14 @@ function handleClick(event) {
     event.stopPropagation();
 
     //save payload globally so tabs can recalculate
-    capturedPayload = extractElementStyles(event.target);
+    try {
+        capturedPayload = extractElementStyles(event.target);
+    } catch (e) {
+        console.error("[DivBurglar] Heist Failed:", e);
+        return;
+    }
+
+    if (!capturedPayload) return;
 
     reticle.style.backgroundColor = 'rgba(255, 255, 255, 0.22)';
     reticle.style.boxShadow = '0 0 20px rgba(255, 255, 255, 0.6)';
