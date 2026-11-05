@@ -63,6 +63,7 @@ modalOverlay.style.cssText = `
     position: fixed; top: 0; width: 100vw; height: 100vh;
     background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(3px);
     display: none; justify-content: center; align-items: center; z-index: 2147483647; pointer-events: auto;
+    cursor: default;
 `;
 
 modalOverlay.innerHTML = `
