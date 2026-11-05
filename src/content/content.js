@@ -76,6 +76,7 @@ modalOverlay.innerHTML = `
         <div style="display: flex; gap: 8px;" id="db-modal-tabs">
             <span id="db-tab-tailwind" style="color: #ffffff; border: 1px solid #ffffff; padding: 6px 14px; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">TAILWIND</span>
             <span id="db-tab-react" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px cursor: pointer; transition: all 0.2s;">REACT JSX</span>
+            <span id="db-tab-framer" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">FRAMER MOTION</span>
             <span id="db-tab-react-inline" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">REACT INLINE</span>
             <span id="db-tab-css" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px cursor: pointer; transition: all 0.2s;">RAW CSS</span>
         </div>
@@ -111,6 +112,7 @@ const modalDownload = shadow.getElementById('db-modal-download');
 const tabs = {
     'TAILWIND': shadow.getElementById('db-tab-tailwind'),
     'REACT JSX': shadow.getElementById('db-tab-react'),
+    'FRAMER MOTION': shadow.getElementById('db-tab-framer'),
     'REACT INLINE': shadow.getElementById('db-tab-react-inline'),
     'RAW CSS': shadow.getElementById('db-tab-css')
 };
@@ -132,6 +134,7 @@ function renderModalCode() {
     if (!capturedPayload) return;
 
     const voidElements = ['img', 'input', 'br', 'hr', 'path', 'svg', 'circle', 'line', 'polygon', 'rect'];
+    const motionTags = ['div', 'span', 'p', 'a', 'button', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section', 'article', 'main', 'header', 'footer', 'nav', 'svg', 'img', 'ul', 'li'];
 
     //recursive html builder
     function buildHTML(node, indent = '') {
@@ -158,6 +161,25 @@ function renderModalCode() {
         let html = `${indent}<${node.tag}${classAttr}>\n`;
         for (const child of node.children) html += buildJSX(child, indent + '  ');
         html += `${indent}</${node.tag}>\n`;
+        return html;
+    }
+
+    //framer motion
+    function buildFramerJSX(node, indent = '', isRoot = true) {
+        if (node.type === 'text') return `${indent}${node.content}\n`;
+        const tw = compileToTailwind({ css: node.css });
+        const classAttr = tw ? ` className="${tw}"` : '';
+        //convert elements to <motion.div>, <motion.span>, etc..
+        const isMotion = motionTags.includes(node.tag);
+        const tagStr = isMotion ? `motion.${node.tag}` : node.tag;
+        //inject a fade in slide up animation directly onto the root container
+        const animProps = (isRoot && isMotion)
+          ? ` initial={{ opacity: 0, y: 20, }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }}`
+          : '';
+        if (voidElements.includes(node.tag)) return `${indent}<${tagStr}${classAttr}${animProps} />\n`;
+        let html = `${indent}<${tagStr}${classAttr}${animProps}>\n`;
+        for (const child of node.children) html += buildFramerJSX(child, indent + '  ', false);
+        html += `${indent}</${tagStr}>\n`;
         return html;
     }
 
@@ -220,6 +242,9 @@ function renderModalCode() {
     else if (currentModalFormat === 'REACT JSX') {
         modalCode.value = `export default function ${componentName}() {\n  return (\n${buildJSX(capturedPayload, '    ')}  );\n}`;
     }
+    else if (currentModalFormat === 'FRAMER MOTION') {
+        modalCode.value = `import { motion } from "framer-motion";\n\nexport default function ${componentName}() {\n  return (\n${buildFramerJSX(capturedPayload, '    ')}  );\n}`;
+    }
     else if (currentModalFormat === 'REACT INLINE') {
         modalCode.value = `export default function ${componentName}() {\n  return (\n${buildInlineJSX(capturedPayload, '    ')}  );\n}`;
     }
@@ -263,7 +288,7 @@ modalCopy.addEventListener('click', () => {
 modalDownload.addEventListener('click', () => {
     // determine fle extension based on active tab
     let ext = 'html';
-    if (currentModalFormat.includes('REACT')) ext = 'tsx';
+    if (currentModalFormat.includes('REACT') || currentModalFormat === 'FRAMER MOTION') ext = 'tsx';
     if (currentModalFormat === 'RAW CSS') ext = 'css';
 
     //create physical file in browser memory
