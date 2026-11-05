@@ -68,17 +68,16 @@ modalOverlay.style.cssText = `
 
 modalOverlay.innerHTML = `
     <div style="background: #000000; border: 1px solid #2a2a2a; width: 600px; max-width: 90vw; padding: 24px; box-shadow: 0 24px 48px rgba(0,0,0,0.9); display: flex; flex-direction: column; gap: 16px; font-family: 'Roboto', sans-serif;">
-
         <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2a2a2a; padding-bottom: 10px;">
             <span style="color: #ffffff; font-size: 14px; letter-spacing: 3px; font-weight: 300;">SUCCESSFUL HEIST</span>
             <span id="db-modal-close" style="color: #666666; font-size: 11px; cursor: pointer; letter-spacing: 2px; transition: color 0.2s;">[ ESC TO CLOSE ]</span>
         </div>
     
         <div style="display: flex; gap: 8px;" id="db-modal-tabs">
-            <span id="db-tab-tailwind" style="color: #ffffff; border: 1px solid #ffffff; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">TAILWIND</span>
-            <span id="db-tab-react" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">REACT JSX</span>
+            <span id="db-tab-tailwind" style="color: #ffffff; border: 1px solid #ffffff; padding: 6px 14px; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">TAILWIND</span>
+            <span id="db-tab-react" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px cursor: pointer; transition: all 0.2s;">REACT JSX</span>
             <span id="db-tab-react-inline" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">REACT INLINE</span>
-            <span id="db-tab-css" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px;">RAW CSS</span>
+            <span id="db-tab-css" style="color: #666666; border: 1px solid #2a2a2a; padding: 6px 14px; font-size: 10px; letter-spacing: 2px cursor: pointer; transition: all 0.2s;">RAW CSS</span>
         </div>
 
         <textarea id="db-modal-code" readonly style="width: 100%; height: 280px; background: #050505; border: 1px solid #1a1a1a; color: #999999; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; padding: 16px; resize: none; outline: none;"></textarea>
@@ -92,7 +91,7 @@ modalOverlay.innerHTML = `
             </button>
         </div>
     </div>
-`
+`;
 
 shadow.appendChild(reticle);
 shadow.appendChild(hudCard);
@@ -136,13 +135,13 @@ function renderModalCode() {
 
     //recursive html builder
     function buildHTML(node, indent = '') {
-        if (node.type === 'text') return `${indent}$node.content}\n`;
+        if (node.type === 'text') return `${indent}${node.content}\n`;
 
         const tw = compileToTailwind({ css: node.css });
         const classAttr = tw ? ` class="${tw}"` : '';
         if (voidElements.includes(node.tag)) return `${indent}<${node.tag}${classAttr} />\n`;
 
-        let html = `${indent}<${node.tag}${classAttr}\n`;
+        let html = `${indent}<${node.tag}${classAttr}>\n`;
         for (const child of node.children) html += buildHTML(child, indent + ' ');
         html += `${indent}</${node.tag}>\n`;
         return html;
@@ -171,7 +170,7 @@ function renderModalCode() {
         if (cssKeys.length > 0) {
             styleObj = ' style={{ ';
             for (const prop of cssKeys) {
-                const camelProp = prop.replace(/-([a-z]) /g, g => g[1].toUpperCase());
+                const camelProp = prop.replace(/-([a-z])/g, g => g[1].toUpperCase());
                 const safeVal = node.css[prop].replace(/'/g, "\\'");
                 styleObj += `${camelProp}: '${safeVal}', `;
             }
@@ -250,12 +249,12 @@ modalClose.addEventListener('mouseleave', () => { modalClose.style.color = '#666
 
 modalCopy.addEventListener('click', () => {
     navigator.clipboard.writeText(modalCode.value);
-    modalCopy.textContent = '[ COPIED TO CLIPBOARD! ]';
+    modalCopy.textContent = '[ COPIED! ]';
     modalCopy.style.backgroundColor = '#ffffff';
     modalCopy.style.color = '#000000';
 
     setTimeout(() => {
-        modalCopy.textContent = '[ COPY TO CLIPBOARD ]';
+        modalCopy.textContent = '[ COPY CODE ]';
         modalCopy.style.backgroundColor = 'transparent';
         modalCopy.style.color = '#ffffff';
     }, 1500);
@@ -318,7 +317,7 @@ function updateHighlight(el) {
     tagReadout.textContent = formatElementLabel(el);
     dimsReadout.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)} px`;
     layoutReadout.textContent = `DISPLAY // ${computed.display.toUpperCase()}`;
-    modeReadout.textContent = currentFormat;
+    if (modeReadout) modeReadout.textContent = currentFormat;
 
     //position hud card above element (or flip below if near top of viewport)
     hudCard.style.display = 'block';
@@ -327,7 +326,7 @@ function updateHighlight(el) {
     const leftPos = Math.min(Math.max(8, rect.left), window.innerWidth - 240);
 
     hudCard.style.top = `${topPos}px`;
-    hudCard.style.left = `${leftPos}`;
+    hudCard.style.left = `${leftPos}px`;
 }
 
 function handleMouseMove(event) {
@@ -403,17 +402,21 @@ window.addEventListener('keydown', (event) => {
 }, true);
 
 //listen for popup.jsx
-window.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.type === 'GET_STATUS') {
-        sendResponse({ isArmed, format: currentFormat });
-    } else if (message.type === 'TOGGLE_SCANNER') {
-        currentFormat = message.format || currentFormat;
-        setScannerState(Boolean(message.isArmed));
-        sendResponse({ ok: true, isArmed });
-    } else if (message.type === 'SET_FORMAT') {
-        currentFormat = message.format;
-        if (isArmed && modeReadout) modeReadout.textContent = currentFormat;
-        sendResponse({ ok: true });
-    }
-    return true;
-});
+if (window.chrome && window.chrome.runtime) {
+    window.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (message.type === 'GET_STATUS') {
+            sendResponse({ isArmed, format: currentFormat });
+        } else if (message.type === 'TOGGLE_SCANNER') {
+            currentFormat = message.format || currentFormat;
+            setScannerState(Boolean(message.isArmed));
+            sendResponse({ ok: true, isArmed });
+        } else if (message.type === 'SET_FORMAT') {
+            currentFormat = message.format;
+            if (isArmed && modeReadout) modeReadout.textContent = currentFormat;
+            sendResponse({ ok: true });
+        }
+        return true;
+    });
+} else {
+    console.warn("[DivBurglar] Extension runtime not detected. Ensure this is running as a valid content script.");
+}

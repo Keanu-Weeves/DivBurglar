@@ -21,87 +21,50 @@ export function resolveEffectiveBackground(el) {
  * uses caching to only generate an iframe once per tag type, if deep DOM trees exist it wont crash with loads of iframes
  */
 
-const standardBrowserDefaults = {
-  'accent-color': 'auto', 'align-content': 'normal', 'align-items': 'normal', 'align-self': 'auto',
-  'animation-delay': '0s', 'animation-direction': 'normal', 'animation-duration': '0s',
-  'animation-fill-mode': 'none', 'animation-iteration-count': '1', 'animation-name': 'none',
-  'animation-play-state': 'running', 'backdrop-filter': 'none', 'backface-visibility': 'visible',
-  'background-attachment': 'scroll', 'background-blend-mode': 'normal', 'background-clip': 'border-box',
-  'background-image': 'none', 'background-position': '0% 0%', 'background-repeat': 'repeat',
-  'background-size': 'auto', 'border-bottom-left-radius': '0px', 'border-bottom-right-radius': '0px',
-  'border-bottom-style': 'none', 'border-bottom-width': '0px', 'border-collapse': 'separate',
-  'border-image-outset': '0', 'border-image-repeat': 'stretch', 'border-image-slice': '100%',
-  'border-image-source': 'none', 'border-image-width': '1', 'border-left-style': 'none',
-  'border-left-width': '0px', 'border-right-style': 'none', 'border-right-width': '0px',
-  'border-top-left-radius': '0px', 'border-top-right-radius': '0px', 'border-top-style': 'none',
-  'border-top-width': '0px', 'bottom': 'auto', 'box-shadow': 'none', 'box-sizing': 'content-box',
-  'caption-side': 'top', 'clear': 'none', 'clip': 'auto', 'clip-path': 'none', 'clip-rule': 'nonzero',
-  'column-count': 'auto', 'column-fill': 'balance', 'column-gap': 'normal', 'column-rule-style': 'none',
-  'column-rule-width': '0px', 'column-span': 'none', 'column-width': 'auto', 'contain': 'none',
-  'content': 'normal', 'counter-increment': 'none', 'counter-reset': 'none', 'cursor': 'auto',
-  'direction': 'ltr', 'empty-cells': 'show', 'filter': 'none', 'flex-basis': 'auto',
-  'flex-grow': '0', 'flex-shrink': '1', 'float': 'none', 'font-style': 'normal',
-  'font-variant': 'normal', 'font-weight': '400', 'grid-auto-columns': 'auto', 'grid-auto-flow': 'row',
-  'grid-auto-rows': 'auto', 'grid-template-areas': 'none', 'grid-template-columns': 'none',
-  'grid-template-rows': 'none', 'hyphens': 'manual', 'image-rendering': 'auto', 'isolation': 'auto',
-  'justify-content': 'normal', 'justify-items': 'normal', 'justify-self': 'auto', 'left': 'auto',
-  'letter-spacing': 'normal', 'line-break': 'auto', 'list-style-image': 'none', 'list-style-position': 'outside',
-  'list-style-type': 'disc', 'margin-bottom': '0px', 'margin-left': '0px', 'margin-right': '0px',
-  'margin-top': '0px', 'mask-image': 'none', 'mask-position': '0% 0%', 'mask-repeat': 'repeat',
-  'mask-size': 'auto', 'max-height': 'none', 'max-width': 'none', 'min-height': '0px',
-  'min-width': '0px', 'mix-blend-mode': 'normal', 'object-fit': 'fill', 'object-position': '50% 50%',
-  'opacity': '1', 'order': '0', 'orphans': '2', 'outline-color': 'invert', 'outline-offset': '0px',
-  'outline-style': 'none', 'outline-width': '0px', 'overflow-wrap': 'normal', 'overflow-x': 'visible',
-  'overflow-y': 'visible', 'padding-bottom': '0px', 'padding-left': '0px', 'padding-right': '0px',
-  'padding-top': '0px', 'page-break-after': 'auto', 'page-break-before': 'auto', 'page-break-inside': 'auto',
-  'perspective': 'none', 'perspective-origin': '50% 50%', 'pointer-events': 'auto', 'position': 'static',
-  'resize': 'none', 'right': 'auto', 'row-gap': 'normal', 'scroll-behavior': 'auto',
-  'stroke-dasharray': 'none', 'stroke-dashoffset': '0px', 'stroke-linecap': 'butt', 'stroke-linejoin': 'miter',
-  'stroke-miterlimit': '4', 'stroke-opacity': '1', 'stroke-width': '1px', 'table-layout': 'auto',
-  'text-align': 'start', 'text-align-last': 'auto', 'text-decoration-color': 'currentColor',
-  'text-decoration-line': 'none', 'text-decoration-style': 'solid', 'text-indent': '0px',
-  'text-justify': 'auto', 'text-overflow': 'clip', 'text-shadow': 'none', 'text-transform': 'none',
-  'top': 'auto', 'touch-action': 'auto', 'transform': 'none', 'transform-origin': '50% 50%',
-  'transform-style': 'flat', 'transition-delay': '0s', 'transition-duration': '0s',
-  'transition-property': 'all', 'transition-timing-function': 'ease', 'unicode-bidi': 'normal',
-  'vertical-align': 'baseline', 'visibility': 'visible', 'white-space': 'normal', 'widows': '2',
-  'word-break': 'normal', 'word-spacing': '0px', 'writing-mode': 'horizontal-tb', 'z-index': 'auto', 'zoom': '1'
-};
-
 const defaultStylesCache = {};
 
 function getDefaultStyles(tagName) {
 
     if (defaultStylesCache[tagName]) return defaultStylesCache[tagName];
 
-    let defaultStyles = { ...standardBrowserDefaults };
+    let defaultStyles = {};
+    let dummy;
+
+    const svgTags = ['svg', 'path', 'circle', 'rect', 'line', 'polygon', 'g'];
+    const isSvg = svgTags.includes(tagName);
+
     try {
         const iframe = document.createElement('iframe');
         iframe.style.cssText = 'position: absolute; width: 0; height: 0; border: 0; visibility: hidden; pointer-events: none;';
         document.body.appendChild(iframe);
 
-        let dummy;
-        try {
-            dummy = document.createElement(tagName);
-        } catch (e) {
-            dummy = document.createElement('div');
-            console.warn(`Failed to grab element:  ${tagName}"`, e);
-        }
-
-            //fallback div if encountering weird SVG tags that fail HTML creation
-
+        dummy = isSvg ? document.createElementNS('http://www.w3.org/2000/svg', tagName) : document.createElement(tagName);
         iframe.contentDocument.body.appendChild(dummy);
+
         const computed = iframe.contentWindow.getComputedStyle(dummy);
+        if (computed) {
+            for (let i = 0; i < computed.length; i++) {
+                const prop = computed[i];
+                defaultStyles[prop] = computed .getPropertyValue(prop);
+            }
+        }
+        document.body.removeChild(iframe);
+    } catch (e) {
+        console.warn(`[DivBurglar] Iframe blocked by CSP. Using local DOM fallback for <${tagName}>`, "Error: ", e);
+        dummy = isSvg ? document.createElementNS('http://www.w3.org/2000/svg', tagName) : document.createElement(tagName);
+        dummy.style.cssText = 'position: absolute; width: 0; height: 0; visibility: hidden; pointer-events: none;';
+        document.body.appendChild(dummy);
+
+        const computed = window.getComputedStyle(dummy);
         if (computed) {
             for (let i = 0; i < computed.length; i++) {
                 const prop = computed[i];
                 defaultStyles[prop] = computed.getPropertyValue(prop);
             }
         }
-        document.body.removeChild(iframe);
-    } catch (e) {
-        console.warn('[DivBurglar] Failed to extract default styles for:', tagName, 'Error: ', e);
+        document.body.removeChild(dummy);
     }
+
     defaultStylesCache[tagName] = defaultStyles;
     return defaultStyles;
 }
@@ -111,7 +74,8 @@ export function extractElementStyles(el, depth = 0) {
     //prevent infinite recursions and max call stack crashes
     if (depth > 25) return null;
 
-    const tagName = el.tagName.toLowerCase();
+    const tagName = el.tagName ? el.tagName.toLowerCase() : '';
+    if (!tagName) return null;
 
     const ignoredTags = ['script', 'style', 'noscript', 'meta', 'head', 'link', 'title'];
     if (ignoredTags.includes(tagName)) return null;
@@ -134,6 +98,8 @@ export function extractElementStyles(el, depth = 0) {
         'color-scheme', 'text-size-adjust'
     ];
 
+    const logicalProps = ['-block-', '-inline-', '-start-', '-ends-'];
+
     //map properties
     for (let i = 0; i < computed.length; i++) {
         const prop = computed[i];
@@ -147,6 +113,8 @@ export function extractElementStyles(el, depth = 0) {
         if (prop === 'cursor' && targetValue === 'crosshair') continue;
         //ignore useless default colors that mirror the text color
         if (uselessColors.includes(prop)) continue;
+        //block redundant css logical properties to prevent layout duplication, except for grid
+        if (!prop.startsWith('grid-') && logicalProps.some(lp => prop.includes(lp))) continue;
         //ignore border colors if theres no rendered border
         if (prop.includes('border') && prop.includes('color')) {
             const borderStyle = computed.getPropertyValue('border-style');
